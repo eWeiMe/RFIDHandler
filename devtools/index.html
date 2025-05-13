@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RFID Handler 调试工具</title>
+  <style>
+    body {
+      font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+      margin: 0;
+      padding: 20px;
+      background-color: #f5f5f5;
+      color: #333;
+    }
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      background: #fff;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      padding: 20px;
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid #eee;
+    }
+    h1 {
+      margin: 0;
+      font-size: 24px;
+      color: #333;
+    }
+    .panel {
+      background: #f9f9f9;
+      border-radius: 6px;
+      padding: 15px;
+      margin-bottom: 20px;
+    }
+    .panel-title {
+      font-size: 16px;
+      font-weight: bold;
+      margin-bottom: 10px;
+      color: #444;
+    }
+    .control-panel {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    button {
+      background: #1890ff;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: all 0.3s;
+    }
+    button:hover {
+      background: #40a9ff;
+    }
+    button:active {
+      background: #096dd9;
+    }
+    button.secondary {
+      background: #f0f0f0;
+      color: #666;
+    }
+    button.secondary:hover {
+      background: #e0e0e0;
+    }
+    button.danger {
+      background: #ff4d4f;
+    }
+    button.danger:hover {
+      background: #ff7875;
+    }
+    input, select {
+      padding: 8px;
+      border: 1px solid #d9d9d9;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+    .data-display {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+    .log-container {
+      height: 300px;
+      overflow-y: auto;
+      background: #000;
+      color: #fff;
+      padding: 10px;
+      font-family: monospace;
+      font-size: 14px;
+      border-radius: 4px;
+    }
+    .log-entry {
+      margin-bottom: 6px;
+      border-bottom: 1px solid #333;
+      padding-bottom: 6px;
+    }
+    .log-time {
+      color: #888;
+    }
+    .log-event {
+      color: #1890ff;
+    }
+    .log-data {
+      color: #52c41a;
+    }
+    .status-indicator {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      margin-right: 5px;
+    }
+    .status-connected {
+      background-color: #52c41a;
+    }
+    .status-disconnected {
+      background-color: #ff4d4f;
+    }
+    .data-box {
+      padding: 10px;
+      border: 1px solid #eee;
+      border-radius: 4px;
+      margin-bottom: 10px;
+    }
+    .data-row {
+      display: flex;
+      margin-bottom: 5px;
+    }
+    .data-label {
+      font-weight: bold;
+      width: 130px;
+      color: #666;
+    }
+    .data-value {
+      flex: 1;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>RFID Handler 调试工具</h1>
+      <div>
+        <span id="connectionStatus">
+          <span class="status-indicator status-disconnected"></span>
+          未连接
+        </span>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">控制面板</div>
+      <div class="control-panel">
+        <button id="simulateBtn">模拟RFID数据</button>
+        <input type="text" id="mockData" placeholder="输入十六进制数据" value="3132333435363738396162">
+        <input type="text" id="mockIp" placeholder="模拟IP" value="192.168.1.100">
+        <button id="clearLogsBtn" class="secondary">清空日志</button>
+        <button id="exportLogsBtn" class="secondary">导出日志</button>
+        <button id="resetBtn" class="danger">重置状态</button>
+      </div>
+    </div>
+
+    <div class="data-display">
+      <div class="panel">
+        <div class="panel-title">RFID数据</div>
+        <div id="dataPanel">
+          <div class="data-box">
+            <div class="data-row">
+              <div class="data-label">当前状态:</div>
+              <div class="data-value" id="currentStatus">等待数据...</div>
+            </div>
+            <div class="data-row">
+              <div class="data-label">已格式化RFID:</div>
+              <div class="data-value" id="formattedRFID">-</div>
+            </div>
+            <div class="data-row">
+              <div class="data-label">原始RFID:</div>
+              <div class="data-value" id="rawRFID">-</div>
+            </div>
+            <div class="data-row">
+              <div class="data-label">来源IP:</div>
+              <div class="data-value" id="sourceIP">-</div>
+            </div>
+            <div class="data-row">
+              <div class="data-label">十六进制数据:</div>
+              <div class="data-value" id="hexData">-</div>
+            </div>
+            <div class="data-row">
+              <div class="data-label">接收时间:</div>
+              <div class="data-value" id="timestamp">-</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">事件日志</div>
+        <div id="logContainer" class="log-container"></div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import RFIDHandler from '../src/index.js';
+
+    // 创建模拟的API适配器
+    const createMockAdapter = () => {
+      let tcpDataCallback = null;
+      let tcpStatusCallback = null;
+
+      return {
+        // 注册TCP数据接收回调
+        onTcpData: (callback) => {
+          tcpDataCallback = callback;
+          console.log('已注册TCP数据监听');
+        },
+        
+        // 注册TCP状态变更回调
+        onTcpStatus: (callback) => {
+          tcpStatusCallback = callback;
+          console.log('已注册TCP状态监听');
+        },
+        
+        // 触发模拟的TCP数据
+        triggerTcpData: (data) => {
+          if (tcpDataCallback) tcpDataCallback(data);
+        },
+        
+        // 触发模拟的TCP状态变更
+        triggerTcpStatus: (status) => {
+          if (tcpStatusCallback) tcpStatusCallback(status);
+        }
+      };
+    };
+
+    // DOM元素
+    const elements = {
+      simulateBtn: document.getElementById('simulateBtn'),
+      clearLogsBtn: document.getElementById('clearLogsBtn'),
+      exportLogsBtn: document.getElementById('exportLogsBtn'),
+      resetBtn: document.getElementById('resetBtn'),
+      mockData: document.getElementById('mockData'),
+      mockIp: document.getElementById('mockIp'),
+      logContainer: document.getElementById('logContainer'),
+      connectionStatus: document.getElementById('connectionStatus'),
+      currentStatus: document.getElementById('currentStatus'),
+      formattedRFID: document.getElementById('formattedRFID'),
+      rawRFID: document.getElementById('rawRFID'),
+      sourceIP: document.getElementById('sourceIP'),
+      hexData: document.getElementById('hexData'),
+      timestamp: document.getElementById('timestamp')
+    };
+
+    // 日志管理
+    const logger = {
+      logs: [],
+      
+      add(eventType, data) {
+        const entry = {
+          time: new Date(),
+          event: eventType,
+          data: structuredClone(data)
+        };
+        
+        this.logs.push(entry);
+        this.display(entry);
+        
+        // 保持最多显示100条记录
+        if (this.logs.length > 100) {
+          this.logs.shift();
+        }
+      },
+      
+      display(entry) {
+        const logEntry = document.createElement('div');
+        logEntry.className = 'log-entry';
+        
+        const timeStr = entry.time.toISOString().replace('T', ' ').substring(0, 19);
+        
+        logEntry.innerHTML = `
+          <span class="log-time">[${timeStr}]</span>
+          <span class="log-event">[${entry.event}]</span>
+          <span class="log-data">${JSON.stringify(entry.data)}</span>
+        `;
+        
+        elements.logContainer.appendChild(logEntry);
+        elements.logContainer.scrollTop = elements.logContainer.scrollHeight;
+      },
+      
+      clear() {
+        this.logs = [];
+        elements.logContainer.innerHTML = '';
+      },
+      
+      export() {
+        const json = JSON.stringify(this.logs, null, 2);
+        const blob = new Blob([json], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        
+        const a = document.createElement('a');
+        const timestamp = new Date().toISOString().replace(/:/g, '-').replace(/\..+/, '');
+        a.href = url;
+        a.download = `rfid-logs-${timestamp}.json`;
+        a.click();
+        
+        URL.revokeObjectURL(url);
+      }
+    };
+
+    // 更新UI显示
+    function updateDataDisplay(data) {
+      if (!data) {
+        elements.currentStatus.textContent = '等待数据...';
+        return;
+      }
+      
+      elements.currentStatus.textContent = '数据已接收';
+      elements.formattedRFID.textContent = data.formattedRFID || '-';
+      elements.rawRFID.textContent = data.rfid || '-';
+      elements.sourceIP.textContent = data.ip || '-';
+      elements.hexData.textContent = data.rawData || '-';
+      elements.timestamp.textContent = data.timestamp ? new Date(data.timestamp).toLocaleString() : '-';
+    }
+
+    function updateConnectionStatus(connected) {
+      const statusIndicator = elements.connectionStatus.querySelector('.status-indicator');
+      
+      if (connected) {
+        statusIndicator.className = 'status-indicator status-connected';
+        elements.connectionStatus.textContent = ' 已连接';
+        elements.connectionStatus.prepend(statusIndicator);
+      } else {
+        statusIndicator.className = 'status-indicator status-disconnected';
+        elements.connectionStatus.textContent = ' 未连接';
+        elements.connectionStatus.prepend(statusIndicator);
+      }
+    }
+
+    // 初始化RFID处理器
+    const mockAdapter = createMockAdapter();
+    const rfidHandler = new RFIDHandler({
+      autoProcess: true,
+      apiAdapter: mockAdapter
+    });
+
+    // 注册事件监听
+    rfidHandler.on('initialized', (data) => {
+      logger.add('initialized', data);
+    });
+
+    rfidHandler.on('rawData', (data) => {
+      logger.add('rawData', data);
+    });
+
+    rfidHandler.on('dataReady', (data) => {
+      logger.add('dataReady', data);
+      updateDataDisplay(data);
+    });
+
+    rfidHandler.on('error', (error) => {
+      logger.add('error', error);
+      console.error('RFID处理器错误:', error);
+    });
+
+    rfidHandler.on('parseError', (error) => {
+      logger.add('parseError', error);
+      console.warn('RFID解析错误:', error);
+    });
+
+    rfidHandler.on('connectionStatus', (status) => {
+      logger.add('connectionStatus', status);
+      updateConnectionStatus(status.connected);
+    });
+
+    rfidHandler.on('simulatedData', (data) => {
+      logger.add('simulatedData', data);
+    });
+
+    rfidHandler.on('reset', () => {
+      logger.add('reset', {});
+      updateDataDisplay(null);
+      updateConnectionStatus(false);
+    });
+
+    // 添加按钮事件监听
+    elements.simulateBtn.addEventListener('click', () => {
+      const mockIp = elements.mockIp.value || '192.168.1.100';
+      const mockData = elements.mockData.value || '3132333435363738396162';
+      
+      // 触发模拟连接
+      mockAdapter.triggerTcpStatus({
+        ip: mockIp,
+        connected: true
+      });
+      
+      // 模拟数据
+      rfidHandler.simulateDataReceive(mockData, mockIp);
+    });
+
+    elements.clearLogsBtn.addEventListener('click', () => {
+      logger.clear();
+    });
+
+    elements.exportLogsBtn.addEventListener('click', () => {
+      logger.export();
+    });
+
+    elements.resetBtn.addEventListener('click', () => {
+      rfidHandler.reset();
+    });
+
+    // 初始化完成，记录日志
+    logger.add('app', { status: '初始化完成' });
+  </script>
+</body>
+</html> 

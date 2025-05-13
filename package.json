@@ -1,0 +1,33 @@
+{
+    "name": "rfid-handler",
+    "version": "0.1.0",
+    "description": "通用RFID数据处理组件，适用于Electron应用",
+    "main": "dist/index.cjs",
+    "module": "dist/index.js",
+    "exports": {
+        "import": "./dist/index.js",
+        "require": "./dist/index.cjs"
+    },
+    "type": "module",
+    "files": [
+        "dist",
+        "README.md"
+    ],
+    "scripts": {
+        "dev": "vite",
+        "build": "vite build",
+        "preview": "vite preview",
+        "devtools": "vite --config devtools/vite.config.js"
+    },
+    "keywords": [
+        "RFID",
+        "Electron",
+        "TCP"
+    ],
+    "author": "",
+    "license": "MIT",
+    "devDependencies": {
+        "vite": "^4.4.0",
+        "prettier": "^2.8.8"
+    }
+}

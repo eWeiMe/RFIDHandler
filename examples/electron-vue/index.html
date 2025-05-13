@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RFID管理系统</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-plus/dist/index.css" />
+  <style>
+    body {
+      font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: #f5f5f7;
+      color: #333;
+    }
+    #app {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    .header {
+      background-color: #fff;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+    }
+    .main-content {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 20px;
+    }
+    .card {
+      background-color: #fff;
+      border-radius: 8px;
+      padding: 20px;
+      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+    }
+    .log-area {
+      max-height: 500px;
+      overflow-y: auto;
+      background-color: #f9f9f9;
+      border-radius: 4px;
+      padding: 10px;
+      margin-top: 10px;
+      font-family: monospace;
+      font-size: 14px;
+    }
+    .log-entry {
+      border-bottom: 1px solid #eee;
+      padding: 6px 0;
+    }
+    .device-status {
+      display: flex;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      margin-right: 8px;
+    }
+    .connected {
+      background-color: #67C23A;
+    }
+    .disconnected {
+      background-color: #F56C6C;
+    }
+    .rfid-item {
+      padding: 12px;
+      margin-bottom: 10px;
+      border-radius: 4px;
+      background-color: #f9f9f9;
+      border-left: 3px solid #409EFF;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div class="header">
+      <h1>RFID 管理系统示例</h1>
+      <div class="device-status">
+        <div :class="['status-dot', connectionStatus ? 'connected' : 'disconnected']"></div>
+        <span>{{ connectionStatus ? '设备已连接' : '设备未连接' }}</span>
+        <el-button type="primary" size="small" style="margin-left: 20px" @click="simulateData">
+          模拟数据
+        </el-button>
+      </div>
+    </div>
+
+    <div class="main-content">
+      <div>
+        <div class="card">
+          <h2>RFID 记录</h2>
+          <div v-if="rfidList.length === 0" style="padding: 20px 0; text-align: center; color: #999;">
+            暂无数据
+          </div>
+          <div v-else>
+            <div v-for="(item, index) in rfidList" :key="index" class="rfid-item">
+              <div><strong>RFID:</strong> {{ item.formattedRFID }}</div>
+              <div><strong>来源IP:</strong> {{ item.ip }}</div>
+              <div><strong>时间:</strong> {{ formatTime(item.timestamp) }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="card">
+          <h2>设备状态</h2>
+          <div v-if="clients.length === 0" style="padding: 20px 0; text-align: center; color: #999;">
+            无连接设备
+          </div>
+          <div v-else>
+            <el-table :data="clients" style="width: 100%">
+              <el-table-column prop="ip" label="IP地址"></el-table-column>
+              <el-table-column prop="status" label="状态">
+                <template #default="scope">
+                  <el-tag :type="scope.row.status === 'connected' ? 'success' : 'danger'">
+                    {{ scope.row.status === 'connected' ? '已连接' : '已断开' }}
+                  </el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column prop="lastActive" label="最后活动">
+                <template #default="scope">
+                  {{ formatTime(scope.row.lastActive) }}
+                </template>
+              </el-table-column>
+            </el-table>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top: 20px">
+          <h2>事件日志</h2>
+          <div class="log-area">
+            <div v-for="(log, index) in logs" :key="index" class="log-entry">
+              <span>[{{ formatTime(log.time) }}]</span>
+              <span style="color: #409EFF">[{{ log.event }}]</span>
+              <span>{{ log.message }}</span>
+            </div>
+          </div>
+          <el-button size="small" @click="clearLogs" style="margin-top: 10px">清空日志</el-button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { createApp } from 'vue';
+    import ElementPlus from 'element-plus';
+    // 导入我们开发的RFID处理组件
+    import RFIDHandler from '../../../../../dist/index.js';
+
+    const app = createApp({
+      data() {
+        return {
+          rfidHandler: null,
+          connectionStatus: false,
+          rfidList: [],
+          clients: [],
+          logs: [],
+          mockRfidData: '3132333435363738396162', // 模拟数据
+        };
+      },
+      
+      mounted() {
+        this.initRFIDHandler();
+      },
+      
+      methods: {
+        initRFIDHandler() {
+          // 检查window.api是否存在（Electron环境）
+          if (!window.api) {
+            this.addLog('error', '未检测到Electron API，某些功能可能不可用');
+            return;
+          }
+          
+          // 初始化RFID处理器
+          this.rfidHandler = new RFIDHandler({
+            autoProcess: true,
+            apiAdapter: {
+              // 注册TCP数据接收事件
+              onTcpData: (callback) => window.api.on('tcp-data', (_, data) => callback(data)),
+              // 注册TCP状态变更事件
+              onTcpStatus: (callback) => window.api.on('tcp-status', (_, status) => callback(status))
+            }
+          });
+          
+          // 注册事件监听
+          this.rfidHandler.on('initialized', (data) => {
+            this.addLog('info', `RFID处理器初始化完成: ${JSON.stringify(data)}`);
+          });
+          
+          this.rfidHandler.on('dataReady', (data) => {
+            this.addLog('success', `收到RFID数据: ${data.formattedRFID}`);
+            this.rfidList.unshift(data); // 添加到列表最前面
+            
+            // 限制列表长度
+            if (this.rfidList.length > 10) {
+              this.rfidList.pop();
+            }
+          });
+          
+          this.rfidHandler.on('connectionStatus', (status) => {
+            this.connectionStatus = status.connected;
+            this.addLog('info', `连接状态变更: ${status.ip} ${status.connected ? '已连接' : '已断开'}`);
+            this.updateClientsList();
+          });
+          
+          this.rfidHandler.on('error', (error) => {
+            this.addLog('error', `错误: ${error.message}`);
+          });
+          
+          this.addLog('info', 'RFID组件加载完成');
+        },
+        
+        updateClientsList() {
+          if (!this.rfidHandler) return;
+          
+          this.clients = this.rfidHandler.getClients();
+        },
+        
+        simulateData() {
+          if (!window.api) {
+            this.addLog('error', '无法模拟数据，API不可用');
+            return;
+          }
+          
+          const mockIp = '192.168.1.100';
+          window.api.simulateTcpData({
+            mockData: this.mockRfidData,
+            ip: mockIp
+          });
+          
+          this.addLog('info', `已发送模拟数据: ${this.mockRfidData}`);
+        },
+        
+        addLog(type, message) {
+          const log = {
+            time: new Date(),
+            event: type,
+            message
+          };
+          
+          this.logs.unshift(log);
+          
+          // 限制日志数量
+          if (this.logs.length > 50) {
+            this.logs.pop();
+          }
+        },
+        
+        clearLogs() {
+          this.logs = [];
+        },
+        
+        formatTime(time) {
+          if (!time) return '-';
+          
+          const date = new Date(time);
+          return date.toLocaleTimeString();
+        }
+      }
+    });
+    
+    app.use(ElementPlus);
+    app.mount('#app');
+  </script>
+</body>
+</html> 
