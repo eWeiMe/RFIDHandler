@@ -13,11 +13,8 @@
 ## 安装
 
 ```bash
-# 使用yarn安装
-yarn add rfid-handler
-
 # 或者直接从GitHub安装
-yarn add github:your-username/rfid-handler
+yarn add github:eWeiMe/RFIDHandler
 ```
 
 ## 基本使用
